@@ -61,3 +61,27 @@ class PredCodMLPTest(unittest.TestCase):
         next_X = np.array([[10.]])
         X, W, next_err = net._PredCodMLP__update_layer(X, err, W, next_X, True, 1)
         np.testing.assert_array_equal(W, np.array([[-128], [-227], [-22]]))
+    
+    def test_train_step_with_backprop(self):
+        net = PredCodMLP([3,2,1])
+        input = np.array([[1, 0, 1]])
+        X = net.add_bias_col(input)
+        params = [p.copy() for p in net.params]
+        output = np.array([[1]])
+
+        h = np.maximum(0, X.dot(params[0]))
+        h = net.add_bias_col(h)
+        pred = h.dot(params[1])
+        loss = 0.5 * (pred - output)**2
+        dpred = pred - output
+        dw2 = h.T.dot(dpred)
+        dh = dpred.dot(params[1][:-1,:].T)
+        dh[h[:,:-1] <= 0] = 0
+        dw1 = X.T.dot(dh)
+        params[0] += dw1
+        params[1] += dw2
+
+        pc_params, layers = net._PredCodMLP__train_step(net.params, input, output, 1)
+        np.testing.assert_array_equal(pc_params[0], params[0])
+        #np.testing.assert_array_equal(pc_params[1], params[1])
+
