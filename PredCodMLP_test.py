@@ -35,6 +35,29 @@ class PredCodMLPTest(unittest.TestCase):
         preds, layers = net._PredCodMLP__predict(params, input)
         np.testing.assert_array_equal(preds, np.array([[-328],[-742]]))
 
-    def test_train_step_same_update_as_backprop(self):
+    def test_update_layer_zero_err_no_param_update(self):
         net = PredCodMLP([3,2,1])
-        input = np.array
+        X = np.array([[2.,3]])
+        err = np.array([0., 0])
+        W = np.array([[4.],[5],[6]])
+        next_X = np.array([[10.]])
+        X, W, next_err = net._PredCodMLP__update_layer(X, err, W, next_X, False, 1)
+        np.testing.assert_array_equal(X, np.array([[-74, -92]]))
+
+    def test_update_layer_no_param_update(self):
+        net = PredCodMLP([3,2,1])
+        X = np.array([[2.,3]])
+        err = np.array([1., 4])
+        W = np.array([[4.],[5],[6]])
+        next_X = np.array([[10.]])
+        X, W, next_err = net._PredCodMLP__update_layer(X, err, W, next_X, False, 1)
+        np.testing.assert_array_equal(X, np.array([[-75, -96]]))
+
+    def test_update_layer_param_update(self):
+        net = PredCodMLP([3,2,1])
+        X = np.array([[2.,3]])
+        err = np.array([-10., 4])
+        W = np.array([[-2.],[4],[-1]])
+        next_X = np.array([[10.]])
+        X, W, next_err = net._PredCodMLP__update_layer(X, err, W, next_X, True, 1)
+        np.testing.assert_array_equal(W, np.array([[-128], [-227], [-22]]))

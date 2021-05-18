@@ -38,48 +38,28 @@ class PredCodMLP:
         #print("train_step prediction", preds[1])
         layers[-1] = output
         X = self.add_bias_col(input)
-        for t in range(self.num_layers):
+        for t in range(self.num_layers-1):
             curr_mu = X.dot(params[0])
             curr_err = layers[1] - curr_mu
-            if t == self.num_layers - 1:
+            if t == self.num_layers - 2:
                 params[0] += lr * X.T.dot(curr_err)
             for i in range(1, self.num_layers - 1):
-                activated = np.maximum(0, layers[i])
-                h = self.add_bias_col(activated)
-                next_mu = h.dot(params[i])
-                next_err = layers[i+1] - next_mu
-                relu_mask = layers[i] > 0
-                layers[i] += -curr_err + relu_mask * next_err.dot(params[i].T[:,:-1])
-                #can we avoid recalculating curr_mu during learning?
-                activated = np.maximum(0, layers[i])
-                h = self.add_bias_col(activated)
-                curr_mu = h.dot(params[i])
-                curr_err = layers[i+1] - curr_mu
-                if self.num_layers - 1 - i == t:
-                    print('h', h)
-                    print('curr_err', curr_err)
-                    print('h.T.curr_err', h.T.dot(curr_err))
-                    params[i] += lr * h.T.dot(curr_err)
+                update_W = t == self.num_layers - i - 1
+                layers[i], params[i], curr_err = self.__update_layer(layers[i], curr_err, params[i], layers[i+1], update_W, lr)
         return params, layers
     
     def __update_layer(self, X: np.ndarray, err: np.ndarray, W: np.ndarray, next_X: np.ndarray, update_W: bool, lr=.01) \
         -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        activated = np.maximum(0, X)
-        h = self.add_bias_col(activated)
+        h = self.add_bias_col(np.maximum(0, X))
         next_mu = h.dot(W)
         next_err = next_X - next_mu
         relu_mask = X > 0
         X += -err + relu_mask * next_err.dot(W.T[:,:-1])
-        #can we avoid recalculating curr_mu during learning?
-        activated = np.maximum(0, X)
-        h = self.add_bias_col(activated)
-        curr_mu = h.dot(W)
-        curr_err = next_X - curr_mu
+        h = self.add_bias_col(np.maximum(0, X))
+        next_mu = h.dot(W)
+        next_err = next_X - next_mu
         if update_W:
-            print('h', h)
-            print('curr_err', curr_err)
-            print('h.T.curr_err', h.T.dot(curr_err))
-            W += lr * h.T.dot(curr_err)
+            W += lr * h.T.dot(next_err)
         return X, W, next_err
     
     def add_bias_col(self, X: np.ndarray) -> np.ndarray:
