@@ -35,16 +35,17 @@ class PredCodMLP:
 
     def __train_step(self, params: list[np.ndarray], input: np.ndarray, output: np.ndarray, lr=0.01) -> Tuple[list[np.ndarray], list[np.ndarray]]:
         preds, layers = self.__predict(params, input)
-        #print("train_step prediction", preds[1])
         layers[-1] = output
         X = self.add_bias_col(input)
         for t in range(self.num_layers-1):
             curr_mu = X.dot(params[0])
             curr_err = layers[1] - curr_mu
             if t == self.num_layers - 2:
-                params[0] += lr * X.T.dot(curr_err)
+                N = X.shape[0]
+                params[0] += lr * X.T.dot(curr_err) / N
             for i in range(1, self.num_layers - 1):
-                update_W = t == self.num_layers - i - 1
+                update_W = t == self.num_layers - 2 - i
+                #print(t, i)
                 layers[i], params[i], curr_err = self.__update_layer(layers[i], curr_err, params[i], layers[i+1], update_W, lr)
         return params, layers
     
@@ -53,13 +54,16 @@ class PredCodMLP:
         h = self.add_bias_col(np.maximum(0, X))
         next_mu = h.dot(W)
         next_err = next_X - next_mu
+        #print(np.sum(next_err), '\n')
         relu_mask = X > 0
+        #print(-err, next_err.dot(W.T[:,:-1]))
         X += -err + relu_mask * next_err.dot(W.T[:,:-1])
+        if update_W:
+            N = X.shape[0]
+            W += lr * h.T.dot(next_err) / N
         h = self.add_bias_col(np.maximum(0, X))
         next_mu = h.dot(W)
         next_err = next_X - next_mu
-        if update_W:
-            W += lr * h.T.dot(next_err)
         return X, W, next_err
     
     def add_bias_col(self, X: np.ndarray) -> np.ndarray:
@@ -67,3 +71,5 @@ class PredCodMLP:
         biased = np.ones((N, D+1))
         biased[:,:-1] = X
         return biased
+
+    

@@ -72,16 +72,56 @@ class PredCodMLPTest(unittest.TestCase):
         h = np.maximum(0, X.dot(params[0]))
         h = net.add_bias_col(h)
         pred = h.dot(params[1])
-        loss = 0.5 * (pred - output)**2
+        #print('pred: ', pred)
+        #print('net pred: ', net.predict(input))
         dpred = pred - output
+        dw2 = h.T.dot(dpred)
+        #print('dw2: ', dw2)
+        dh = dpred.dot(params[1][:-1,:].T)
+        dh[h[:,:-1] <= 0] = 0
+        dw1 = X.T.dot(dh)
+        params[0] += -dw1
+        params[1] += -dw2
+
+        pc_params, layers = net._PredCodMLP__train_step(net.params, input, output, 1)
+        np.testing.assert_array_almost_equal(pc_params[0], params[0])
+        np.testing.assert_array_equal(pc_params[1], params[1])
+
+    def test_train_step_with_backprop2(self):
+        N = 100 # number of points per class
+        D = 2 # dimensionality
+        K = 3 # number of classes
+        input = np.zeros((N*K,D)) # data matrix (each row = single example)
+        y = np.zeros(N*K, dtype='uint8') # class labels
+        for j in range(K):
+            ix = range(N*j,N*(j+1))
+            r = np.linspace(0.0,1,N) # radius
+            t = np.linspace(j*4,(j+1)*4,N) + np.random.randn(N)*0.2 # theta
+            input[ix] = np.c_[r*np.sin(t), r*np.cos(t)]
+            y[ix] = j
+
+        net = PredCodMLP([D,100,K])
+        X = net.add_bias_col(input)
+        params = [p.copy() for p in net.params]
+        output = np.array([[1,0,0]])
+
+        h = np.maximum(0, X.dot(params[0]))
+        h = net.add_bias_col(h)
+        pred = h.dot(params[1])
+        dpred = (pred - output) / (N*K)
         dw2 = h.T.dot(dpred)
         dh = dpred.dot(params[1][:-1,:].T)
         dh[h[:,:-1] <= 0] = 0
         dw1 = X.T.dot(dh)
-        params[0] += dw1
-        params[1] += dw2
+        lr = 0.1
+        params[0] += -lr * dw1
+        params[1] += -lr * dw2
 
-        pc_params, layers = net._PredCodMLP__train_step(net.params, input, output, 1)
-        np.testing.assert_array_equal(pc_params[0], params[0])
-        #np.testing.assert_array_equal(pc_params[1], params[1])
+        pc_params, layers = net._PredCodMLP__train_step(net.params, input, output, lr)
+        np.testing.assert_array_almost_equal(pc_params[0], params[0])
+        np.testing.assert_array_almost_equal(pc_params[1], params[1])
 
+        h = np.maximum(0, X.dot(params[0]))
+        h = net.add_bias_col(h)
+        pred = h.dot(params[1])
+        #print(pred[1])
