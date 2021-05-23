@@ -1,10 +1,10 @@
 import numpy as np
 from math import sqrt
 from numpy.random import default_rng
-from typing import Tuple
+from typing import Tuple, List
 
 class PredCodMLP:
-    def __init__(self, layer_dims: list[int]):
+    def __init__(self, layer_dims: List[int]):
         self.params = []
         self.layer_dims = layer_dims
         self.num_layers = len(layer_dims)
@@ -19,7 +19,7 @@ class PredCodMLP:
     def predict(self, input: np.ndarray) -> np.ndarray:
         return self.__predict(self.params, input)[0]
 
-    def __predict(self, params: list[np.ndarray], input: np.ndarray) -> Tuple[np.ndarray, list[np.ndarray]]:
+    def __predict(self, params: List[np.ndarray], input: np.ndarray) -> Tuple[np.ndarray, List[np.ndarray]]:
         layers = []
         X = self.add_bias_col(input)
         layers.append(X)
@@ -33,7 +33,7 @@ class PredCodMLP:
     def train_step(self, input: np.ndarray, output: np.ndarray, lr=0.01):
         self.__train_step(self.params, input, output, lr)
 
-    def __train_step(self, params: list[np.ndarray], input: np.ndarray, output: np.ndarray, lr=0.01) -> Tuple[list[np.ndarray], list[np.ndarray]]:
+    def __train_step(self, params: List[np.ndarray], input: np.ndarray, output: np.ndarray, lr=0.01) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         preds, layers = self.__predict(params, input)
         layers[-1] = output
         X = self.add_bias_col(input)
