@@ -8,10 +8,10 @@ class CNN:
     def __init__(   self,
                     batch_size: int, C:int, H: int, W: int,
                     num_filters: int, num_classes: int):
-        self.W1 = np.random.normal(scale=2/np.sqrt(25), size=(num_filters, C, 5, 5))
+        self.W1 = np.random.normal(scale=(np.sqrt(2/25)), size=(num_filters, C, 5, 5))
         self.b1 = np.zeros(num_filters)
         num_conv_weights = int(num_filters * (H/2)**2)
-        self.W2 = np.random.normal(scale=2/np.sqrt(num_conv_weights), size=(num_conv_weights, num_classes))
+        self.W2 = np.random.normal(scale=(np.sqrt(2/num_conv_weights)), size=(num_conv_weights, num_classes))
         self.b2 = np.zeros(num_classes)
     
     def forward(self, X: np.ndarray) -> Tuple[np.ndarray, Tuple]:
@@ -31,7 +31,18 @@ class CNN:
 
 
     def backward(self, dscores: np.ndarray, cache: Tuple) -> Dict[str, np.ndarray]:
-        return {}
+        grads = {}
+        cache1, cache2, cache3 = cache
+        dh2, dW2, db2 = affine_backward(dscores, cache3)
+        grads['W2'] = dW2
+        grads['b2'] = db2
+        #TODO: determine reshape dims more elegantly (cache them?)
+        N, C, H, width = cache1[0][0].shape
+        dh1 = max_pool_backward_fast(dh2.reshape(N,25,int(H/2),int(H/2)), cache2)
+        dX, dW1, db1 = conv_relu_backward(dh1, cache1)
+        grads['W1'] = dW1
+        grads['b1'] = db1
+        return grads
 
 def conv_relu_forward(X: np.ndarray, W: np.ndarray, b: np.ndarray, num_filters: int) -> Tuple[np.ndarray, Tuple]:
     N, C, H, width = X.shape
@@ -42,20 +53,37 @@ def conv_relu_forward(X: np.ndarray, W: np.ndarray, b: np.ndarray, num_filters: 
     a, relu_cache = relu_forward(h)
     return a, (conv_cache, relu_cache)
 
+def conv_relu_backward(dup: np.ndarray, cache: Tuple[Tuple, Tuple[np.ndarray]]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    conv_cache, relu_cache = cache
+    dH = relu_backward(dup, relu_cache)
+    dX, dW, db = conv_backward_fast(dH, conv_cache)
+    return dX, dW, db
+
 def relu_forward(X: np.ndarray) -> Tuple[np.ndarray, Tuple]:
     A = np.maximum(0, X)
     return A, (X > 0)
+
+def relu_backward(dup: np.ndarray, cache: Tuple[np.ndarray]) -> np.ndarray:
+    mask = cache[0]
+    return dup * mask
 
 def affine_forward(X: np.ndarray, W: np.ndarray, b: np.ndarray) -> Tuple[np.ndarray, Tuple]:
     h = X.dot(W) + b
     return h, (X, W, b)
 
-def softmax_loss(scores: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def affine_backward(dup: np.ndarray, cache: Tuple[np.ndarray, np.ndarray, np.ndarray]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    X, W, b = cache
+    dx = dup.dot(W.T)
+    dW = X.T.dot(dup)
+    db = np.sum(dup, 0)
+    return dx, dW, db
+
+def softmax_loss(scores: np.ndarray, y: np.ndarray) -> Tuple[float, np.ndarray]:
     N, K = scores.shape
     scores -= np.max(scores, 1)
     exp_scores = np.exp(scores)
     probs = exp_scores / np.sum(exp_scores, 1)[:,np.newaxis]
-    loss = np.mean(-np.log(probs[y]), 0)
+    loss = np.mean(-np.log(probs[:,y]), 0)
 
     dscores = probs.copy()
     dscores[range(N),y] -= 1
