@@ -80,10 +80,10 @@ def affine_backward(dup: np.ndarray, cache: Tuple[np.ndarray, np.ndarray, np.nda
 
 def softmax_loss(scores: np.ndarray, y: np.ndarray) -> Tuple[float, np.ndarray]:
     N, K = scores.shape
-    scores -= np.max(scores, 1)
+    scores -= np.max(scores, 1)[:, np.newaxis]
     exp_scores = np.exp(scores)
     probs = exp_scores / np.sum(exp_scores, 1)[:,np.newaxis]
-    loss = np.mean(-np.log(probs[:,y]), 0)
+    loss = np.mean(-np.log(probs[range(N),y]), 0)
 
     dscores = probs.copy()
     dscores[range(N),y] -= 1
