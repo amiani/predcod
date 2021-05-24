@@ -32,16 +32,17 @@ class CNN:
 
     def backward(self, dscores: np.ndarray, cache: Tuple) -> Dict[str, np.ndarray]:
         grads = {}
-        cache1, cache2, cache3 = cache
-        dh2, dW2, db2 = affine_backward(dscores, cache3)
+        conv_relu_cache, pool_cache, affine_cache = cache
+        dh2, dW2, db2 = affine_backward(dscores, affine_cache)
         grads['W2'] = dW2
         grads['b2'] = db2
         #TODO: determine reshape dims more elegantly (cache them?)
-        N, C, H, width = cache1[0][0].shape
-        dh1 = max_pool_backward_fast(dh2.reshape(N,25,int(H/2),int(H/2)), cache2)
-        dX, dW1, db1 = conv_relu_backward(dh1, cache1)
+        N, C, H, width = conv_relu_cache[0][0].shape
+        dh1 = max_pool_backward_fast(dh2.reshape(N,25,int(H/2),int(H/2)), pool_cache)
+        dX, dW1, db1 = conv_relu_backward(dh1, conv_relu_cache)
         grads['W1'] = dW1
         grads['b1'] = db1
+        #print(grads['W1'])
         return grads
 
 def conv_relu_forward(X: np.ndarray, W: np.ndarray, b: np.ndarray, num_filters: int) -> Tuple[np.ndarray, Tuple]:
@@ -82,9 +83,11 @@ def softmax_loss(scores: np.ndarray, y: np.ndarray) -> Tuple[float, np.ndarray]:
     N, K = scores.shape
     scores -= np.max(scores, 1)[:, np.newaxis]
     exp_scores = np.exp(scores)
-    probs = exp_scores / np.sum(exp_scores, 1)[:,np.newaxis]
-    loss = np.mean(-np.log(probs[range(N),y]), 0)
+    probs = exp_scores / np.sum(exp_scores, 1, keepdims=True)
+    #print(probs)
+    loss = np.mean(-np.log(probs[range(N),y]))
 
     dscores = probs.copy()
     dscores[range(N),y] -= 1
+    dscores /= N
     return loss, dscores
