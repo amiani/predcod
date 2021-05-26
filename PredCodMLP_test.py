@@ -1,7 +1,9 @@
 import unittest
 import numpy as np
+from numpy.core.numeric import cross
 
-from PredCodMLP import PredCodMLP
+from PredCodMLP import PredCodMLP, add_bias_col, softmax, cross_entropy_loss
+from adam import adam
 
 class PredCodMLPTest(unittest.TestCase):
     def test_predict_all_zeros(self):
@@ -41,7 +43,7 @@ class PredCodMLPTest(unittest.TestCase):
         err = np.array([0., 0])
         W = np.array([[4.],[5],[6]])
         next_X = np.array([[10.]])
-        X, W, next_err = net._PredCodMLP__update_layer(X, err, W, next_X, False, 1)
+        X, W, next_err, config = net._PredCodMLP__update_layer(X, err, W, next_X, False, None, 1)
         np.testing.assert_array_equal(X, np.array([[-74, -92]]))
 
     def test_update_layer_no_param_update(self):
@@ -50,7 +52,7 @@ class PredCodMLPTest(unittest.TestCase):
         err = np.array([1., 4])
         W = np.array([[4.],[5],[6]])
         next_X = np.array([[10.]])
-        X, W, next_err = net._PredCodMLP__update_layer(X, err, W, next_X, False, 1)
+        X, W, next_err, config = net._PredCodMLP__update_layer(X, err, W, next_X, False, None, 1)
         np.testing.assert_array_equal(X, np.array([[-75, -96]]))
 
     def test_update_layer_param_update(self):
@@ -59,31 +61,32 @@ class PredCodMLPTest(unittest.TestCase):
         err = np.array([-10., 4])
         W = np.array([[-2.],[4],[-1]])
         next_X = np.array([[10.]])
-        X, W, next_err = net._PredCodMLP__update_layer(X, err, W, next_X, True, 1)
+        X, W, next_err, config = net._PredCodMLP__update_layer(X, err, W, next_X, True, None, 1)
         np.testing.assert_array_equal(W, np.array([[-128], [-227], [-22]]))
     
     def test_train_step_with_backprop(self):
-        net = PredCodMLP([3,2,1])
+        net = PredCodMLP([3,2,2])
         input = np.array([[1, 0, 1]])
-        X = net.add_bias_col(input)
+        X = add_bias_col(input)
         params = [p.copy() for p in net.params]
-        output = np.array([[1]])
+        output = np.array([1])
 
         h = np.maximum(0, X.dot(params[0]))
-        h = net.add_bias_col(h)
-        pred = h.dot(params[1])
+        h = add_bias_col(h)
+        scores = h.dot(params[1])
+        loss, dscores = cross_entropy_loss(scores, output)
         #print('pred: ', pred)
         #print('net pred: ', net.predict(input))
-        dpred = pred - output
-        dw2 = h.T.dot(dpred)
+        dw2 = h.T.dot(dscores)
         #print('dw2: ', dw2)
-        dh = dpred.dot(params[1][:-1,:].T)
+        dh = dscores.dot(params[1][:-1,:].T)
         dh[h[:,:-1] <= 0] = 0
         dw1 = X.T.dot(dh)
-        params[0] += -dw1
-        params[1] += -dw2
+        configs = [{},{}]
+        params[0], _ = adam(params[0], dw1, configs[0])
+        params[1], _ = adam(params[1], dw2, configs[1])
 
-        pc_params, layers = net._PredCodMLP__train_step(net.params, input, output, 1)
+        pc_params, layers = net._PredCodMLP__train_step(net.params, input, output, [{},{}])
         np.testing.assert_array_almost_equal(pc_params[0], params[0])
         np.testing.assert_array_equal(pc_params[1], params[1])
 
